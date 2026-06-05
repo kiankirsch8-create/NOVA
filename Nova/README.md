@@ -5,9 +5,9 @@ NOVA is a keyboard-activated voice assistant for Mac, connected to the APEX trad
 ## Requirements
 
 - macOS
-- Python 3.10+
+- Python 3.9+
 - Microphone access
-- Accessibility access (for global hotkey)
+- Accessibility access (for global CMD+J hotkey)
 
 ## Installation
 
@@ -40,14 +40,11 @@ Or double-click `start_nova.sh` (make it executable first: `chmod +x start_nova.
 
 ## Usage
 
-1. Start NOVA — it runs in the background with a menubar icon.
+1. Start NOVA — it runs in the terminal waiting for the hotkey.
 2. Press **CMD+J** to activate (pleasant chime plays).
-3. Speak your command when you see `listening...` in the terminal.
-4. NOVA responds by voice and immediately listens for the next command.
+3. Speak your command during the 5-second recording window.
+4. NOVA responds by voice and automatically records another 5 seconds.
 5. Press **CMD+J** again to stop, or say "stop" / "goodbye".
-6. Sessions auto-end after 30 seconds of no voice input.
-
-**Menubar indicator:** green circle = active session, grey circle = inactive.
 
 ## Mac Permissions
 
@@ -56,7 +53,7 @@ Grant these in **System Settings → Privacy & Security**:
 | Permission      | Why                                      |
 |-----------------|------------------------------------------|
 | **Microphone**  | Voice input via Whisper                  |
-| **Accessibility** | Global CMD+J hotkey via pynput       |
+| **Accessibility** | Global CMD+J hotkey via keyboard library |
 
 Restart NOVA after granting permissions.
 
@@ -87,7 +84,7 @@ If APIs are offline, NOVA uses the last cached data and tells you.
 Edit `nova_config.py` to change:
 
 - Voice (Rachel or Adam via `ELEVENLABS_VOICE_ID`)
-- Hotkey, silence detection, session timeout
+- Hotkey and recording duration
 - Claude model and token limits
 
 ## Troubleshooting

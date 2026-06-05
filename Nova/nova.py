@@ -11,8 +11,7 @@ from datetime import datetime, timezone
 from typing import Optional, Tuple
 
 import anthropic
-import rumps
-from pynput import keyboard
+import keyboard
 
 import nova_apex
 import nova_config as config
@@ -402,201 +401,69 @@ class NovaBrain:
         return reply, end_session
 
 
-CMD_KEYS = {
-    keyboard.Key.cmd,
-    keyboard.Key.cmd_l,
-    keyboard.Key.cmd_r,
-}
+session_active = False
+last_toggle = 0.0
+brain = NovaBrain()
 
 
-def _is_j_key(key) -> bool:
-    """Return True if the pressed key is the letter J."""
-    char = getattr(key, "char", None)
-    if char is not None:
-        return char.lower() == "j"
-    return False
+def run_session() -> None:
+    """Record, transcribe, think, and speak until session_active becomes False."""
+    global session_active
 
-
-class HotkeyMonitor(threading.Thread):
-    """Edge-triggered CMD+J monitor — fires once per key press, not on repeat."""
-
-    def __init__(self, on_toggle) -> None:
-        super().__init__(daemon=True)
-        self._on_toggle = on_toggle
-        self._cmd_down = False
-        self._j_down = False
-        self._listener: Optional[keyboard.Listener] = None
-
-    def _on_press(self, key, injected=False) -> None:
-        if injected:
-            return
-        if key in CMD_KEYS:
-            self._cmd_down = True
-            return
-        if self._cmd_down and _is_j_key(key) and not self._j_down:
-            self._j_down = True
-            self._on_toggle()
-
-    def _on_release(self, key, injected=False) -> None:
-        if injected:
-            return
-        if key in CMD_KEYS:
-            self._cmd_down = False
-        if _is_j_key(key):
-            self._j_down = False
-
-    def run(self) -> None:
-        self._listener = keyboard.Listener(
-            on_press=self._on_press,
-            on_release=self._on_release,
-        )
-        self._listener.start()
-        self._listener.join()
-
-
-class NovaApp(rumps.App):
-    def __init__(self) -> None:
-        super().__init__(
-            config.NOVA_NAME,
-            title="⚪",
-            quit_button="Quit NOVA",
-        )
-        self.active = False
-        self._stop_event = threading.Event()
-        self._session_thread: Optional[threading.Thread] = None
-        self.brain = NovaBrain()
-        self._hotkey_monitor: Optional[HotkeyMonitor] = None
-        self._lock = threading.Lock()
-        self._cooldown_until = 0.0
-
-        self.menu = [
-            rumps.MenuItem("Toggle Session (⌘J)", callback=self.toggle_session),
-            rumps.MenuItem("Status: Inactive", callback=None),
-        ]
-
-    def _set_menubar_state(self, active: bool) -> None:
-        self.title = "🟢" if active else "⚪"
-        self.menu["Status: Inactive"].title = (
-            "Status: Active" if active else "Status: Inactive"
-        )
-
-    def toggle_session(self, _=None) -> None:
-        self._apply_toggle()
-
-    def _request_hotkey_toggle(self) -> None:
-        now = time.time()
-        if now < self._cooldown_until:
-            return
-        self._cooldown_until = now + config.HOTKEY_COOLDOWN_SECONDS
-        rumps.Timer(lambda _: self._apply_toggle(), 0.01).start()
-
-    def _apply_toggle(self) -> None:
-        with self._lock:
-            if self.active:
-                self._deactivate()
-            else:
-                self._activate()
-
-    def _activate(self) -> None:
-        if self.active:
-            return
-        if self._session_thread and self._session_thread.is_alive():
-            return
-
-        self.active = True
-        self._stop_event.clear()
-        self._set_menubar_state(True)
+    try:
         nova_voice.play_activation_sound()
         print("[NOVA] Session started. Speak your command.")
 
-        self._session_thread = threading.Thread(
-            target=self._session_loop,
-            name="nova-listener",
-            daemon=True,
-        )
-        self._session_thread.start()
+        while session_active:
+            heard = nova_voice.listen()
+            if not session_active:
+                break
 
-    def _deactivate(self) -> None:
-        if not self.active:
-            return
+            if not heard or not heard.strip():
+                nova_voice.speak("I didn't catch that, please try again")
+                continue
 
-        self.active = False
-        self._stop_event.set()
-        self._set_menubar_state(False)
-        self.brain.clear()
+            response, end_session = brain.think(heard)
+            if not session_active:
+                break
+
+            if not nova_voice.speak(response):
+                print(f"[NOVA] {response}")
+
+            if end_session:
+                session_active = False
+                break
+    finally:
+        brain.clear()
+        session_active = False
         nova_voice.play_deactivation_sound()
         print("[NOVA] Session ended.")
 
-    def _session_loop(self) -> None:
-        last_activity = time.time()
 
-        try:
-            while self.active and not self._stop_event.is_set():
-                if time.time() - last_activity > config.SESSION_TIMEOUT:
-                    print("[NOVA] Session timed out after 30 seconds of inactivity.")
-                    break
+def toggle_session() -> None:
+    global session_active, last_toggle
 
-                # Still actively listening — don't count this wait toward session timeout.
-                last_activity = time.time()
-                heard = nova_voice.listen()
-                if not self.active or self._stop_event.is_set():
-                    break
+    now = time.time()
+    if now - last_toggle < 2.0:
+        return
+    last_toggle = now
 
-                if heard is None:
-                    continue
-
-                if heard == "":
-                    nova_voice.speak("I didn't catch that, please try again")
-                    last_activity = time.time()
-                    continue
-
-                last_activity = time.time()
-
-                if not heard.strip():
-                    continue
-
-                response, end_session = self.brain.think(heard)
-                if not self.active or self._stop_event.is_set():
-                    break
-
-                if not nova_voice.speak(response):
-                    print(f"[NOVA] {response}")
-
-                if end_session:
-                    break
-
-                last_activity = time.time()
-        finally:
-            with self._lock:
-                if self.active:
-                    self.active = False
-                    self._stop_event.set()
-                    self._set_menubar_state(False)
-                    self.brain.clear()
-                    nova_voice.play_deactivation_sound()
-                    print("[NOVA] Session ended.")
-
-    @rumps.clicked("Toggle Session (⌘J)")
-    def menu_toggle(self, _=None) -> None:
-        self.toggle_session()
-
-
-def _start_hotkey_monitor(app: NovaApp) -> HotkeyMonitor:
-    monitor = HotkeyMonitor(on_toggle=app._request_hotkey_toggle)
-    monitor.start()
-    return monitor
+    if not session_active:
+        session_active = True
+        threading.Thread(target=run_session, daemon=True).start()
+    else:
+        session_active = False
 
 
 def main() -> None:
     print(f"[NOVA] Starting {config.NOVA_NAME} for {config.USER_NAME}")
     print(f"[NOVA] Press {config.ACTIVATION_HOTKEY.upper()} to activate/deactivate.")
-    print("[NOVA] Menubar icon: green = active, grey = inactive.")
+    print("[NOVA] Running in terminal. Press CMD+J to start or stop a session.")
 
     nova_voice.init_microphone()
 
-    app = NovaApp()
-    app._hotkey_monitor = _start_hotkey_monitor(app)
-    app.run()
+    keyboard.add_hotkey("cmd+j", toggle_session)
+    keyboard.wait()
 
 
 if __name__ == "__main__":

@@ -4,7 +4,6 @@ elevenlabs
 sounddevice
 numpy
 pygame
-pynput
-rumps
+keyboard
 requests
 scipy
