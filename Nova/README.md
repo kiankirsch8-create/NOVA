@@ -18,11 +18,17 @@ cd Nova
 pip install -r requirements.txt
 ```
 
-2. Fill in API keys in `nova_config.py`:
+2. Create your config from the template and fill in API keys:
+
+```bash
+cp nova_config.example.py nova_config.py
+```
 
    - `ANTHROPIC_API_KEY`
    - `OPENAI_API_KEY`
    - `ELEVENLABS_API_KEY`
+
+   `nova_config.py` is gitignored so keys are not committed.
 
 3. Run NOVA:
 

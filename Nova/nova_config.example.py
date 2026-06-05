@@ -1,4 +1,4 @@
-"""NOVA configuration — API keys and settings."""
+"""NOVA configuration template — copy to nova_config.py and fill in API keys."""
 
 # API Keys (fill in before running)
 ANTHROPIC_API_KEY = "your_key_here"
