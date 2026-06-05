@@ -1,13 +1,13 @@
 # NOVA — AI Voice Assistant
 
-NOVA is a keyboard-activated voice assistant for Mac, connected to the APEX trading ecosystem. Press **CMD+J** to start or stop a listening session. NOVA hears you via Whisper, thinks with Claude, and responds with ElevenLabs voice.
+NOVA is a terminal voice assistant for Mac, connected to the APEX trading ecosystem. Press **ENTER** to start or stop a listening session. NOVA hears you via Whisper, thinks with Claude, and responds with ElevenLabs voice.
 
 ## Requirements
 
 - macOS
 - Python 3.9+
 - Microphone access
-- Accessibility access (for global CMD+J hotkey)
+- Terminal access (runs from Terminal or iTerm)
 
 ## Installation
 
@@ -40,11 +40,12 @@ Or double-click `start_nova.sh` (make it executable first: `chmod +x start_nova.
 
 ## Usage
 
-1. Start NOVA — it runs in the terminal waiting for the hotkey.
-2. Press **CMD+J** to activate (pleasant chime plays).
+1. Start NOVA — it runs in the terminal.
+2. Press **ENTER** to start a session (pleasant chime plays).
 3. Speak your command during the 5-second recording window.
 4. NOVA responds by voice and automatically records another 5 seconds.
-5. Press **CMD+J** again to stop, or say "stop" / "goodbye".
+5. Press **ENTER** again to stop, or say "stop" / "goodbye".
+6. Press **ENTER** once more to start a new session.
 
 ## Mac Permissions
 
@@ -53,9 +54,7 @@ Grant these in **System Settings → Privacy & Security**:
 | Permission      | Why                                      |
 |-----------------|------------------------------------------|
 | **Microphone**  | Voice input via Whisper                  |
-| **Accessibility** | Global CMD+J hotkey via keyboard library |
-
-Restart NOVA after granting permissions.
+Restart NOVA after granting microphone permission.
 
 ## Voice Commands
 
@@ -84,7 +83,7 @@ If APIs are offline, NOVA uses the last cached data and tells you.
 Edit `nova_config.py` to change:
 
 - Voice (Rachel or Adam via `ELEVENLABS_VOICE_ID`)
-- Hotkey and recording duration
+- Recording duration
 - Claude model and token limits
 
 ## Troubleshooting

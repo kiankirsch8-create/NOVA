@@ -11,7 +11,6 @@ from datetime import datetime, timezone
 from typing import Optional, Tuple
 
 import anthropic
-import keyboard
 
 import nova_apex
 import nova_config as config
@@ -402,8 +401,15 @@ class NovaBrain:
 
 
 session_active = False
-last_toggle = 0.0
 brain = NovaBrain()
+
+
+def _wait_for_stop() -> None:
+    """Background thread: second Enter press stops the active session."""
+    global session_active
+    input()
+    session_active = False
+    print("[NOVA] Stop requested.")
 
 
 def run_session() -> None:
@@ -440,30 +446,19 @@ def run_session() -> None:
         print("[NOVA] Session ended.")
 
 
-def toggle_session() -> None:
-    global session_active, last_toggle
-
-    now = time.time()
-    if now - last_toggle < 2.0:
-        return
-    last_toggle = now
-
-    if not session_active:
-        session_active = True
-        threading.Thread(target=run_session, daemon=True).start()
-    else:
-        session_active = False
-
-
 def main() -> None:
+    global session_active
+
     print(f"[NOVA] Starting {config.NOVA_NAME} for {config.USER_NAME}")
-    print(f"[NOVA] Press {config.ACTIVATION_HOTKEY.upper()} to activate/deactivate.")
-    print("[NOVA] Running in terminal. Press CMD+J to start or stop a session.")
+    print("Press ENTER to start speaking, press ENTER again to stop")
 
     nova_voice.init_microphone()
 
-    keyboard.add_hotkey("cmd+j", toggle_session)
-    keyboard.wait()
+    while True:
+        input()
+        session_active = True
+        threading.Thread(target=_wait_for_stop, daemon=True).start()
+        run_session()
 
 
 if __name__ == "__main__":
