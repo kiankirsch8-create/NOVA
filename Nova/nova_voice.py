@@ -3,7 +3,6 @@
 import io
 import os
 import tempfile
-import wave
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -93,67 +92,28 @@ def _get_openai_client() -> OpenAI:
     return _openai_client
 
 
-def _rms(audio: np.ndarray) -> float:
-    if audio.size == 0:
-        return 0.0
-    return float(np.sqrt(np.mean(np.square(audio.astype(np.float64)))))
-
-
-def record_speech() -> Optional[np.ndarray]:
-    """
-    Record from microphone until silence is detected.
-    Returns float32 mono audio at SAMPLE_RATE, or None if too short / no speech.
-    """
+def record_audio() -> np.ndarray:
+    """Record a fixed-duration clip from the microphone."""
     sample_rate = config.SAMPLE_RATE
-    chunk_samples = int(sample_rate * config.CHUNK_DURATION)
-    silence_chunks_needed = int(config.SILENCE_DURATION / config.CHUNK_DURATION)
-    min_chunks = max(1, int(config.MIN_RECORDING_SECONDS / config.CHUNK_DURATION))
-    max_chunks = int(config.MAX_RECORDING_SECONDS / config.CHUNK_DURATION)
-
-    recorded: list[np.ndarray] = []
-    silence_chunks = 0
-    speech_started = False
-
-    print("listening...")
+    duration = config.RECORDING_DURATION_SECONDS
+    samples = int(sample_rate * duration)
 
     device = _input_device
     if device is None:
         init_microphone()
         device = _input_device
 
-    for _ in range(max_chunks):
-        chunk = sd.rec(
-            chunk_samples,
-            samplerate=sample_rate,
-            channels=1,
-            dtype="float32",
-            device=device,
-            blocking=True,
-        )
-        chunk = chunk.flatten()
-        level = _rms(chunk)
-        print(f"[NOVA] Audio level: {level:.4f} (threshold: {config.SILENCE_THRESHOLD})")
+    print(f"[NOVA] Listening for {duration} seconds...")
 
-        if not speech_started:
-            # Wait for speech before recording or starting the silence timer.
-            if level >= config.SILENCE_THRESHOLD:
-                speech_started = True
-                recorded.append(chunk)
-            continue
-
-        recorded.append(chunk)
-        if level >= config.SILENCE_THRESHOLD:
-            silence_chunks = 0
-        else:
-            silence_chunks += 1
-
-        if len(recorded) >= min_chunks and silence_chunks >= silence_chunks_needed:
-            break
-
-    if not speech_started or len(recorded) < min_chunks:
-        return None
-
-    return np.concatenate(recorded)
+    audio = sd.rec(
+        samples,
+        samplerate=sample_rate,
+        channels=1,
+        dtype="float32",
+        device=device,
+        blocking=True,
+    )
+    return audio.flatten()
 
 
 def _save_wav(audio: np.ndarray, path: str) -> None:
@@ -195,14 +155,12 @@ def transcribe(audio: np.ndarray) -> Optional[str]:
 
 def listen() -> Optional[str]:
     """
-    Record and transcribe one utterance.
-    Returns None if no speech detected, empty string if transcription failed.
+    Record for a fixed duration, transcribe with Whisper, and return text.
+    Returns empty string if nothing useful was heard.
     """
-    audio = record_speech()
-    if audio is None:
-        return None
+    audio = record_audio()
     text = transcribe(audio)
-    if text is None:
+    if text is None or not text.strip():
         return ""
     return text
 
