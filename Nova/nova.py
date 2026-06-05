@@ -536,13 +536,13 @@ class NovaApp(rumps.App):
                     print("[NOVA] Session timed out after 30 seconds of inactivity.")
                     break
 
+                # Still actively listening — don't count this wait toward session timeout.
+                last_activity = time.time()
                 heard = nova_voice.listen()
                 if not self.active or self._stop_event.is_set():
                     break
 
                 if heard is None:
-                    if time.time() - last_activity > config.SESSION_TIMEOUT:
-                        break
                     continue
 
                 if heard == "":

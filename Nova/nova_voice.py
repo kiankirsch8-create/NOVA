@@ -112,7 +112,7 @@ def record_speech() -> Optional[np.ndarray]:
 
     recorded: list[np.ndarray] = []
     silence_chunks = 0
-    speech_detected = False
+    speech_started = False
 
     print("listening...")
 
@@ -134,18 +134,23 @@ def record_speech() -> Optional[np.ndarray]:
         level = _rms(chunk)
         print(f"[NOVA] Audio level: {level:.4f} (threshold: {config.SILENCE_THRESHOLD})")
 
-        if level >= config.SILENCE_THRESHOLD:
-            speech_detected = True
-            silence_chunks = 0
-        elif speech_detected:
-            silence_chunks += 1
+        if not speech_started:
+            # Wait for speech before recording or starting the silence timer.
+            if level >= config.SILENCE_THRESHOLD:
+                speech_started = True
+                recorded.append(chunk)
+            continue
 
         recorded.append(chunk)
+        if level >= config.SILENCE_THRESHOLD:
+            silence_chunks = 0
+        else:
+            silence_chunks += 1
 
-        if speech_detected and len(recorded) >= min_chunks and silence_chunks >= silence_chunks_needed:
+        if len(recorded) >= min_chunks and silence_chunks >= silence_chunks_needed:
             break
 
-    if not speech_detected or len(recorded) < min_chunks:
+    if not speech_started or len(recorded) < min_chunks:
         return None
 
     return np.concatenate(recorded)
