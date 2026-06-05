@@ -17,6 +17,63 @@ from openai import OpenAI
 import nova_config as config
 
 _openai_client: Optional[OpenAI] = None
+_input_device: Optional[int] = None
+_input_device_name: Optional[str] = None
+
+
+def init_microphone() -> None:
+    """List input devices and select the system default microphone."""
+    global _input_device, _input_device_name
+
+    devices = sd.query_devices()
+    default_pair = sd.default.device
+    default_input = default_pair[0] if isinstance(default_pair, (list, tuple)) else default_pair
+
+    print("[NOVA] Available input devices:")
+    input_devices = []
+    for index, device in enumerate(devices):
+        if device.get("max_input_channels", 0) > 0:
+            input_devices.append((index, device))
+            is_default = index == default_input
+            marker = " (system default)" if is_default else ""
+            print(
+                f"  [{index}] {device['name']} "
+                f"({device['max_input_channels']} ch, {device['default_samplerate']} Hz){marker}"
+            )
+
+    selected_index = None
+    selected_name = None
+
+    if isinstance(default_input, int) and default_input >= 0:
+        selected_index = default_input
+        selected_name = devices[default_input]["name"]
+    else:
+        for index, device in input_devices:
+            name = device["name"].lower()
+            if any(token in name for token in ("microphone", "mic", "built-in", "macbook")):
+                selected_index = index
+                selected_name = device["name"]
+                break
+
+    if selected_index is None and input_devices:
+        selected_index, device = input_devices[0]
+        selected_name = device["name"]
+
+    if selected_index is None:
+        raise RuntimeError("No microphone input devices found.")
+
+    _input_device = selected_index
+    _input_device_name = selected_name
+
+    # Force sounddevice to use the chosen input for all recordings.
+    sd.default.device = (selected_index, sd.default.device[1])
+    sd.check_input_settings(
+        device=selected_index,
+        channels=1,
+        samplerate=config.SAMPLE_RATE,
+    )
+
+    print(f"[NOVA] Selected microphone: [{selected_index}] {selected_name}")
 
 
 def _log_error(message: str) -> None:
@@ -57,14 +114,20 @@ def record_speech() -> Optional[np.ndarray]:
 
     print("listening...")
 
+    device = _input_device
+    if device is None:
+        init_microphone()
+        device = _input_device
+
     for _ in range(max_chunks):
         chunk = sd.rec(
             chunk_samples,
             samplerate=sample_rate,
             channels=1,
             dtype="float32",
+            device=device,
+            blocking=True,
         )
-        sd.wait()
         chunk = chunk.flatten()
         level = _rms(chunk)
         print(f"[NOVA] Audio level: {level:.4f} (threshold: {config.SILENCE_THRESHOLD})")
