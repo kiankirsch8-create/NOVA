@@ -74,7 +74,10 @@ def init_microphone() -> None:
         samplerate=config.SAMPLE_RATE,
     )
 
-    print(f"[NOVA] Selected microphone: [{selected_index}] {selected_name}")
+    print(
+        f"[NOVA] Selected microphone: [{selected_index}] {selected_name} "
+        f"at {config.SAMPLE_RATE} Hz"
+    )
 
 
 def _log_error(message: str) -> None:
@@ -92,47 +95,100 @@ def _get_openai_client() -> OpenAI:
     return _openai_client
 
 
-def record_audio() -> np.ndarray:
-    """Record a fixed-duration clip from the microphone."""
+def _rms(audio: np.ndarray) -> float:
+    if audio.size == 0:
+        return 0.0
+    return float(np.sqrt(np.mean(np.square(audio.astype(np.float64)))))
+
+
+def record_audio() -> Optional[np.ndarray]:
+    """
+    Record continuously until the speaker stops talking.
+    Stops after SILENCE_DURATION seconds below SILENCE_THRESHOLD.
+    """
     sample_rate = config.SAMPLE_RATE
-    duration = config.RECORDING_DURATION_SECONDS
-    samples = int(sample_rate * duration)
+    chunk_samples = int(sample_rate * config.CHUNK_DURATION)
+    silence_chunks_needed = int(config.SILENCE_DURATION / config.CHUNK_DURATION)
+    min_chunks = max(1, int(config.MIN_RECORDING_SECONDS / config.CHUNK_DURATION))
+    max_chunks = int(config.MAX_RECORDING_SECONDS / config.CHUNK_DURATION)
 
     device = _input_device
     if device is None:
         init_microphone()
         device = _input_device
 
-    print(f"[NOVA] Listening for {duration} seconds...")
+    recorded: list[np.ndarray] = []
+    silence_chunks = 0
+    speech_started = False
 
-    audio = sd.rec(
-        samples,
-        samplerate=sample_rate,
-        channels=1,
-        dtype="float32",
-        device=device,
-        blocking=True,
-    )
-    return audio.flatten()
+    print("[NOVA] Listening... speak now.")
+
+    for _ in range(max_chunks):
+        chunk = sd.rec(
+            chunk_samples,
+            samplerate=sample_rate,
+            channels=1,
+            dtype="float32",
+            device=device,
+            blocking=True,
+        )
+        chunk = chunk.flatten()
+        level = _rms(chunk)
+        print(
+            f"[NOVA] Audio level: {level:.4f} "
+            f"(threshold: {config.SILENCE_THRESHOLD})"
+        )
+
+        if level >= config.SILENCE_THRESHOLD:
+            speech_started = True
+            silence_chunks = 0
+            recorded.append(chunk)
+            continue
+
+        if not speech_started:
+            continue
+
+        recorded.append(chunk)
+        silence_chunks += 1
+
+        if len(recorded) >= min_chunks and silence_chunks >= silence_chunks_needed:
+            print("[NOVA] Silence detected — stopping recording.")
+            break
+
+    if not speech_started or len(recorded) < min_chunks:
+        print("[NOVA] No speech detected.")
+        return None
+
+    duration = len(recorded) * config.CHUNK_DURATION
+    print(f"[NOVA] Recorded {duration:.1f} seconds of audio.")
+    return np.concatenate(recorded)
 
 
-def _save_wav(audio: np.ndarray, path: str) -> None:
+def _save_wav(audio: np.ndarray, path: str, sample_rate: int) -> None:
     clipped = np.clip(audio, -1.0, 1.0)
     int_audio = (clipped * 32767).astype(np.int16)
-    wavfile.write(path, config.SAMPLE_RATE, int_audio)
+    wavfile.write(path, sample_rate, int_audio)
 
 
 def transcribe(audio: np.ndarray) -> Optional[str]:
-    """Send audio to Whisper API and return transcribed text."""
+    """Save audio as WAV and send to Whisper API."""
     if config.OPENAI_API_KEY in ("", "your_key_here"):
         _log_error("OpenAI API key not configured")
         return None
 
+    sample_rate = config.SAMPLE_RATE
     tmp_path = None
     try:
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
             tmp_path = tmp.name
-        _save_wav(audio, tmp_path)
+
+        _save_wav(audio, tmp_path, sample_rate)
+        file_size = os.path.getsize(tmp_path)
+        print(f"[NOVA] WAV file size: {file_size} bytes (rate: {sample_rate} Hz)")
+
+        if file_size < config.MIN_WAV_BYTES:
+            print("[NOVA] Recording failed — audio file too small for Whisper.")
+            return None
 
         with open(tmp_path, "rb") as audio_file:
             client = _get_openai_client()
@@ -141,12 +197,17 @@ def transcribe(audio: np.ndarray) -> Optional[str]:
                 file=audio_file,
                 language="en",
             )
-        text = (result.text or "").strip()
+
+        raw_text = result.text if result.text is not None else ""
+        print(f"[NOVA] Whisper returned: {raw_text!r}")
+
+        text = raw_text.strip()
         if text:
             print(f"[NOVA] Heard: {text}")
         return text or None
     except Exception as exc:
         _log_error(f"Whisper transcription failed: {exc}")
+        print(f"[NOVA] Whisper error: {exc}")
         return None
     finally:
         if tmp_path and os.path.exists(tmp_path):
@@ -154,11 +215,10 @@ def transcribe(audio: np.ndarray) -> Optional[str]:
 
 
 def listen() -> Optional[str]:
-    """
-    Record for a fixed duration, transcribe with Whisper, and return text.
-    Returns empty string if nothing useful was heard.
-    """
+    """Record until silence, transcribe with Whisper, and return text."""
     audio = record_audio()
+    if audio is None:
+        return ""
     text = transcribe(audio)
     if text is None or not text.strip():
         return ""
