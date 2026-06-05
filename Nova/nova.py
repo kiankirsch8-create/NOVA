@@ -512,18 +512,10 @@ class NovaApp(rumps.App):
 
 
 def _start_hotkey_listener(app: NovaApp) -> keyboard.Listener:
-    hotkey = keyboard.HotKey(
-        keyboard.HotKey.parse("<cmd>+j"),
-        lambda: app._on_hotkey(),
-    )
-
-    def for_canonical(f):
-        return lambda k, *args: f(listener.canonical(k), *args)
-
-    listener = keyboard.Listener(
-        on_press=for_canonical(hotkey.press),
-        on_release=for_canonical(hotkey.release),
-    )
+    # GlobalHotKeys handles pynput 1.8.x (key, injected) callbacks correctly.
+    listener = keyboard.GlobalHotKeys({
+        "<cmd>+j": app._on_hotkey,
+    })
     listener.daemon = True
     listener.start()
     return listener
