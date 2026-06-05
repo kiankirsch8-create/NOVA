@@ -410,10 +410,11 @@ CMD_KEYS = {
 
 
 def _is_j_key(key) -> bool:
-    if hasattr(key, "char") and key.char:
-        return key.char.lower() == "j"
-    vk = getattr(key, "vk", None)
-    return vk in (38, 106)
+    """Return True if the pressed key is the letter J."""
+    char = getattr(key, "char", None)
+    if char is not None:
+        return char.lower() == "j"
+    return False
 
 
 class HotkeyMonitor(threading.Thread):
@@ -432,7 +433,7 @@ class HotkeyMonitor(threading.Thread):
         if key in CMD_KEYS:
             self._cmd_down = True
             return
-        if self._cmd_down and nova_voice._is_j_key(key) and not self._j_down:
+        if self._cmd_down and _is_j_key(key) and not self._j_down:
             self._j_down = True
             self._on_toggle()
 

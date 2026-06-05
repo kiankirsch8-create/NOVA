@@ -44,16 +44,18 @@ def init_microphone() -> None:
     selected_index = None
     selected_name = None
 
-    if isinstance(default_input, int) and default_input >= 0:
+    # Prefer built-in MacBook mic over Continuity Camera / iPhone devices.
+    for index, device in input_devices:
+        name = device["name"]
+        name_lower = name.lower()
+        if "macbook" in name_lower or "built-in" in name_lower:
+            selected_index = index
+            selected_name = name
+            break
+
+    if selected_index is None and isinstance(default_input, int) and default_input >= 0:
         selected_index = default_input
         selected_name = devices[default_input]["name"]
-    else:
-        for index, device in input_devices:
-            name = device["name"].lower()
-            if any(token in name for token in ("microphone", "mic", "built-in", "macbook")):
-                selected_index = index
-                selected_name = device["name"]
-                break
 
     if selected_index is None and input_devices:
         selected_index, device = input_devices[0]
