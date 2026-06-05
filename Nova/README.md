@@ -42,8 +42,8 @@ Or double-click `start_nova.sh` (make it executable first: `chmod +x start_nova.
 
 1. Start NOVA — it runs in the terminal.
 2. Press **ENTER** to start a session (pleasant chime plays).
-3. Speak your command during the 5-second recording window.
-4. NOVA responds by voice and automatically records another 5 seconds.
+3. Speak your command — recording stops automatically when you pause.
+4. NOVA responds by voice and listens again for your next command.
 5. Press **ENTER** again to stop, or say "stop" / "goodbye".
 6. Press **ENTER** once more to start a new session.
 
