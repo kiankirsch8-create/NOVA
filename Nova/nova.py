@@ -415,6 +415,8 @@ class NovaApp(rumps.App):
         self.brain = NovaBrain()
         self._hotkey_listener: Optional[keyboard.Listener] = None
         self._lock = threading.Lock()
+        self._last_hotkey_time = 0.0
+        self._hotkey_debounce_seconds = 2.0
 
         self.menu = [
             rumps.MenuItem("Toggle Session (⌘J)", callback=self.toggle_session),

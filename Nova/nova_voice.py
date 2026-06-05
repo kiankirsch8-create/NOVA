@@ -67,6 +67,7 @@ def record_speech() -> Optional[np.ndarray]:
         sd.wait()
         chunk = chunk.flatten()
         level = _rms(chunk)
+        print(f"[NOVA] Audio level: {level:.4f} (threshold: {config.SILENCE_THRESHOLD})")
 
         if level >= config.SILENCE_THRESHOLD:
             speech_detected = True
