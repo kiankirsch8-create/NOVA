@@ -2,6 +2,7 @@
 
 import time
 from datetime import datetime, timezone
+from typing import Optional, Union
 
 import requests
 
@@ -23,7 +24,7 @@ def _log_error(message: str) -> None:
         pass
 
 
-def _get_json(path: str, timeout: int = 30) -> dict | str | None:
+def _get_json(path: str, timeout: int = 30) -> Optional[Union[dict, str]]:
     url = f"{config.APEX_RAILWAY_URL}{path}"
     try:
         response = requests.get(url, timeout=timeout)
@@ -102,7 +103,7 @@ def get_live_status() -> dict:
     return {"error": "unavailable", "stale": True}
 
 
-def get_dashboard_summary() -> dict | str:
+def get_dashboard_summary() -> Union[dict, str]:
     now = time.time()
     if (
         _cache["dashboard"]["data"] is not None

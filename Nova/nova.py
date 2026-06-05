@@ -8,6 +8,7 @@ import threading
 import time
 import webbrowser
 from datetime import datetime, timezone
+from typing import Optional, Tuple
 
 import anthropic
 import rumps
@@ -205,7 +206,7 @@ def _execute_tool(name: str, tool_input: dict) -> tuple[str, bool]:
     return "Done.", False
 
 
-def _handle_local_command(text: str) -> tuple[str | None, bool]:
+def _handle_local_command(text: str) -> Tuple[Optional[str], bool]:
     """Fast-path local commands without Claude when patterns are obvious."""
     lowered = text.lower().strip()
 
@@ -410,9 +411,9 @@ class NovaApp(rumps.App):
         )
         self.session_active = False
         self._stop_event = threading.Event()
-        self._session_thread: threading.Thread | None = None
+        self._session_thread: Optional[threading.Thread] = None
         self.brain = NovaBrain()
-        self._hotkey_listener: keyboard.Listener | None = None
+        self._hotkey_listener: Optional[keyboard.Listener] = None
         self._lock = threading.Lock()
 
         self.menu = [

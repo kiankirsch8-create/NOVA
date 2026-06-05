@@ -5,6 +5,7 @@ import os
 import tempfile
 import wave
 from datetime import datetime, timezone
+from typing import Optional
 
 import numpy as np
 import pygame
@@ -15,7 +16,7 @@ from openai import OpenAI
 
 import nova_config as config
 
-_openai_client: OpenAI | None = None
+_openai_client: Optional[OpenAI] = None
 
 
 def _log_error(message: str) -> None:
@@ -39,7 +40,7 @@ def _rms(audio: np.ndarray) -> float:
     return float(np.sqrt(np.mean(np.square(audio.astype(np.float64)))))
 
 
-def record_speech() -> np.ndarray | None:
+def record_speech() -> Optional[np.ndarray]:
     """
     Record from microphone until silence is detected.
     Returns float32 mono audio at SAMPLE_RATE, or None if too short / no speech.
@@ -90,7 +91,7 @@ def _save_wav(audio: np.ndarray, path: str) -> None:
     wavfile.write(path, config.SAMPLE_RATE, int_audio)
 
 
-def transcribe(audio: np.ndarray) -> str | None:
+def transcribe(audio: np.ndarray) -> Optional[str]:
     """Send audio to Whisper API and return transcribed text."""
     if config.OPENAI_API_KEY in ("", "your_key_here"):
         _log_error("OpenAI API key not configured")
@@ -121,7 +122,7 @@ def transcribe(audio: np.ndarray) -> str | None:
             os.unlink(tmp_path)
 
 
-def listen() -> str | None:
+def listen() -> Optional[str]:
     """
     Record and transcribe one utterance.
     Returns None if no speech detected, empty string if transcription failed.
