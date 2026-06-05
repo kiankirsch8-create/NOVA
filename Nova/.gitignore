@@ -1,4 +1,3 @@
 __pycache__/
 *.pyc
 nova_errors.log
-nova_config.py
