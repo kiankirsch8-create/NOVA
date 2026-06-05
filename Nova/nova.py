@@ -5,7 +5,6 @@ import json
 import re
 import subprocess
 import threading
-import time
 import webbrowser
 from datetime import datetime, timezone
 from typing import Optional, Tuple
