@@ -376,6 +376,7 @@ class NovaBrain:
         Returns (spoken_response, should_end_session).
         """
         local, end_session = _handle_local_command(user_text)
+        print("[DEBUG] local command checked")
         if local == "__CLEAR_CONVERSATION__":
             self.clear()
             return "Conversation cleared.", False
