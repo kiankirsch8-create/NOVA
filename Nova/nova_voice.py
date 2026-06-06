@@ -1,4 +1,4 @@
-"""Voice input (Google STT) and output (ElevenLabs + pygame)."""
+"""Voice input (OpenAI Whisper) and output (ElevenLabs + pygame)."""
 
 import io
 import os
@@ -11,7 +11,7 @@ import pygame
 import requests
 import scipy.io.wavfile as wavfile
 import sounddevice as sd
-import speech_recognition as sr
+from openai import OpenAI
 
 import nova_config as config
 
@@ -165,7 +165,11 @@ def _save_wav(audio: np.ndarray, path: str, sample_rate: int) -> None:
 
 
 def transcribe(audio: np.ndarray) -> Optional[str]:
-    """Save audio as WAV and transcribe with Google Speech Recognition (free)."""
+    """Save audio as WAV and transcribe with OpenAI Whisper."""
+    if config.OPENAI_API_KEY in ("", "your_key_here"):
+        _log_error("OpenAI API key not configured")
+        return None
+
     sample_rate = config.SAMPLE_RATE
     wav_path = None
     try:
@@ -177,30 +181,26 @@ def transcribe(audio: np.ndarray) -> Optional[str]:
         print(f"[NOVA] WAV file size: {file_size} bytes (rate: {sample_rate} Hz)")
 
         if file_size < config.MIN_WAV_BYTES:
-            print("[NOVA] Recording failed — audio file too small for speech recognition.")
+            print("[NOVA] Recording failed — audio file too small for Whisper.")
             return None
 
-        recognizer = sr.Recognizer()
-        with sr.AudioFile(wav_path) as source:
-            audio_data = recognizer.record(source)
-        text = recognizer.recognize_google(audio_data)
+        client = OpenAI(api_key=config.OPENAI_API_KEY)
+        with open(wav_path, "rb") as f:
+            transcript = client.audio.transcriptions.create(
+                model="whisper-1",
+                file=f,
+            )
+        text = transcript.text
 
-        print(f"[NOVA] Google returned: {text!r}")
+        print(f"[NOVA] Whisper returned: {text!r}")
 
-        text = text.strip()
+        text = (text or "").strip()
         if text:
             print(f"[NOVA] Heard: {text}")
         return text or None
-    except sr.UnknownValueError:
-        print("[NOVA] Google could not understand the audio.")
-        return None
-    except sr.RequestError as exc:
-        _log_error(f"Google speech recognition failed: {exc}")
-        print(f"[NOVA] Google speech recognition error: {exc}")
-        return None
     except Exception as exc:
-        _log_error(f"Speech transcription failed: {exc}")
-        print(f"[NOVA] Speech recognition error: {exc}")
+        _log_error(f"Whisper transcription failed: {exc}")
+        print(f"[NOVA] Whisper error: {exc}")
         return None
     finally:
         if wav_path and os.path.exists(wav_path):
@@ -208,7 +208,7 @@ def transcribe(audio: np.ndarray) -> Optional[str]:
 
 
 def listen() -> Optional[str]:
-    """Record until silence, transcribe with Google STT, and return text."""
+    """Record until silence, transcribe with Whisper, and return text."""
     audio = record_audio()
     if audio is None:
         return ""
