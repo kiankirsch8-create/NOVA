@@ -1,15 +1,19 @@
 """Voice input (SpeechRecognition + Whisper API) and output (ElevenLabs + pygame)."""
 
 import io
+import os
+import sys
 from datetime import datetime, timezone
 from typing import Optional
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import numpy as np
 import pygame
 import requests
 import speech_recognition as sr
 
-import nova_config as config
+import nova_config
 
 
 def init_microphone() -> None:
