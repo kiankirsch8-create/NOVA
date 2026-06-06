@@ -384,6 +384,7 @@ class NovaBrain:
             return local, end_session
 
         apex_status = nova_apex.get_apex_status()
+        print("[DEBUG] apex fetched")
         memory_context = nova_memory.get_memory_context()
         context_block = (
             f"Current APEX status: {json.dumps(apex_status, default=str)}\n"
@@ -391,6 +392,7 @@ class NovaBrain:
         )
 
         self.conversation.append({"role": "user", "content": user_text})
+        print("[DEBUG] calling Claude...")
         if len(self.conversation) > config.CONVERSATION_MEMORY_LENGTH * 2:
             self.conversation = self.conversation[-config.CONVERSATION_MEMORY_LENGTH * 2 :]
 
@@ -405,6 +407,7 @@ class NovaBrain:
                 tools=CLAUDE_TOOLS,
                 messages=self.conversation,
             )
+            print("[DEBUG] Claude returned")
         except Exception as exc:
             _log_error(f"Claude API failed: {exc}")
             print(f"[NOVA] Claude error: {exc}")
@@ -462,6 +465,7 @@ class NovaBrain:
             self.clear()
 
         reply = " ".join(spoken_parts).strip()
+        print(f"[DEBUG] reply ready: {reply[:50]}")
         if not reply:
             reply = "I'm not sure how to help with that."
 
