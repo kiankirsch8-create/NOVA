@@ -23,7 +23,7 @@ def init_microphone() -> None:
 
 def _log_error(message: str) -> None:
     try:
-        with open(config.ERROR_LOG_FILE, "a", encoding="utf-8") as f:
+        with open(nova_config.ERROR_LOG_FILE, "a", encoding="utf-8") as f:
             f.write(f"{datetime.now(timezone.utc).isoformat()} [VOICE] {message}\n")
     except OSError:
         pass
@@ -31,7 +31,7 @@ def _log_error(message: str) -> None:
 
 def listen() -> Optional[str]:
     """Listen via SpeechRecognition with automatic silence detection."""
-    if config.OPENAI_API_KEY in ("", "your_key_here"):
+    if nova_config.OPENAI_API_KEY in ("", "your_key_here"):
         _log_error("OpenAI API key not configured")
         print("[NOVA] Error: OpenAI API key not configured")
         return ""
@@ -47,7 +47,7 @@ def listen() -> Optional[str]:
 
         text = recognizer.recognize_openai(
             audio,
-            api_key=config.OPENAI_API_KEY,
+            api_key=nova_config.OPENAI_API_KEY,
             model="whisper-1",
         )
         print(f"[NOVA] Heard: {text}")
@@ -101,22 +101,22 @@ def speak(text: str) -> bool:
     if not text.strip():
         return False
 
-    if config.ELEVENLABS_API_KEY in ("", "your_key_here"):
+    if nova_config.ELEVENLABS_API_KEY in ("", "your_key_here"):
         print(f"[NOVA] {text}")
         return False
 
-    url = f"https://api.elevenlabs.io/v1/text-to-speech/{config.ELEVENLABS_VOICE_ID}"
+    url = f"https://api.elevenlabs.io/v1/text-to-speech/{nova_config.ELEVENLABS_VOICE_ID}"
     headers = {
-        "xi-api-key": config.ELEVENLABS_API_KEY,
+        "xi-api-key": nova_config.ELEVENLABS_API_KEY,
         "Content-Type": "application/json",
         "Accept": "audio/mpeg",
     }
     payload = {
         "text": text,
-        "model_id": config.ELEVENLABS_MODEL,
+        "model_id": nova_config.ELEVENLABS_MODEL,
         "voice_settings": {
-            "stability": config.ELEVENLABS_STABILITY,
-            "similarity_boost": config.ELEVENLABS_SIMILARITY_BOOST,
+            "stability": nova_config.ELEVENLABS_STABILITY,
+            "similarity_boost": nova_config.ELEVENLABS_SIMILARITY_BOOST,
         },
     }
 
