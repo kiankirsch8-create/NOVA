@@ -167,6 +167,20 @@ def get_apex_status() -> dict:
     return combined
 
 
+def get_live_logs_text() -> str:
+    """Fetch recent live trader log lines."""
+    raw = _get_json("/api/live/logs/text")
+    if isinstance(raw, str) and raw.strip():
+        return raw.strip()
+    if isinstance(raw, dict):
+        logs = raw.get("logs") or raw.get("text") or raw.get("tail")
+        if isinstance(logs, str) and logs.strip():
+            return logs.strip()
+        if isinstance(logs, list):
+            return "\n".join(str(line) for line in logs[-20:])
+    return "Live logs are currently unavailable."
+
+
 def format_status_for_speech(status: dict) -> str:
     """Abbreviated spoken status format."""
     backtest = status.get("backtest", {})

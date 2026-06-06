@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""NOVA — keyboard-activated voice assistant for Mac."""
+"""NOVA — voice command center for the APEX trading ecosystem."""
 
 import json
 import re
@@ -16,26 +16,30 @@ import nova_config as config
 import nova_memory
 import nova_voice
 
-SYSTEM_PROMPT = """You are NOVA, an intelligent AI assistant for a forex trader named Kian.
-You have access to real-time APEX trading system data.
-You are sharp, direct, and efficient. Never waste words.
-Keep all responses under 3 sentences unless asked for detail.
-You know everything about the APEX trading system, its strategies,
-backtest results, and live trading performance.
-When asked about APEX status, use the data provided in the context.
-Current APEX knowledge:
-- APEX is an automated forex trading engine
-- It uses 68 strategies across multiple timeframes
-- It identifies macro regimes (STRONG_TAILWIND to STRONG_HEADWIND)
-- Best performance: STRONG_TAILWIND + MEDIUM confidence = 72% WR
-- Live demo account: €96,908 starting capital on June 1 2026
-- Backtest target: restore golden performer that made $247,096 from $10,000
+SYSTEM_PROMPT = """You are NOVA, the intelligent assistant for Kian's APEX trading ecosystem.
+You are like Jarvis from Iron Man — sharp, direct, efficient, and genuinely
+helpful. You know everything about APEX.
 
-Respond in plain conversational text only — no bullet points, markdown, or headers.
-Speak numbers naturally for voice (e.g. "ninety-seven thousand" not "97,000").
+APEX is an autonomous forex trading engine that:
+- Uses 68 strategies across multiple timeframes
+- Identifies macro regimes (STRONG_TAILWIND produces 72% win rate)
+- Made $247,096 from $10,000 in 2.3 years in backtesting
+- Is currently live trading on a €96,908 demo account since June 1 2026
+- Is running a v7.6 backtest currently showing 35% better than v7.5
 
-When the user wants a local action, call the appropriate tool instead of describing it.
-For MT5, tell the user it runs on the VPS and they should open the VPS instead."""
+Kian is 18 years old building a trading empire. His goal is to pass a
+funded account challenge (€100k-200k) in 2026, compound profits quietly,
+and build the full APEX ecosystem.
+
+Rules for responses:
+- Keep responses under 3 sentences for simple questions
+- Speak numbers naturally: 'ninety-seven thousand' not '97,000'
+- Be direct and confident, never vague
+- When you have live APEX data in context, use it specifically
+- Never say 'I don't have access to' — always try to help
+- Address Kian by name occasionally
+
+Respond in plain conversational text only — no bullet points, markdown, or headers."""
 
 CLAUDE_TOOLS = [
     {
@@ -133,6 +137,16 @@ CLAUDE_TOOLS = [
     },
 ]
 
+STOP_PHRASES = (
+    "stop",
+    "goodbye",
+    "exit",
+    "that is all",
+    "that's all",
+    "thats all",
+    "exit nova",
+)
+
 
 def _log_error(message: str) -> None:
     try:
@@ -142,9 +156,41 @@ def _log_error(message: str) -> None:
         pass
 
 
+def _strip_nova_prefix(text: str) -> str:
+    return re.sub(r"^(?:hey\s+)?nova[,\s]+", "", text.strip(), flags=re.IGNORECASE)
+
+
+def _is_stop_command(text: str) -> bool:
+    lowered = _strip_nova_prefix(text).lower().strip()
+    return any(phrase in lowered for phrase in STOP_PHRASES)
+
+
+def handle_open_command(text: str) -> Optional[str]:
+    """Open apps and URLs by voice command."""
+    text_lower = text.lower()
+    if any(w in text_lower for w in ["dashboard", "railway"]):
+        subprocess.Popen(["open", f"{config.APEX_RAILWAY_URL}/dashboard"])
+        return "Opening the APEX dashboard."
+    if "github" in text_lower:
+        subprocess.Popen(["open", "https://github.com/kiankirsch8-create/APEX"])
+        return "Opening GitHub."
+    if "cursor" in text_lower:
+        subprocess.Popen(["open", "-a", "Cursor"])
+        return "Opening Cursor."
+    if "terminal" in text_lower:
+        subprocess.Popen(["open", "-a", "Terminal"])
+        return "Opening Terminal."
+    if "vps" in text_lower and "open" in text_lower:
+        return (
+            "The VPS is at 192.248.191.134. "
+            "Use Remote Desktop or SSH to connect."
+        )
+    return None
+
+
 def _open_mac_app(name: str) -> str:
     if name.lower() in ("mt5", "metatrader", "metatrader 5"):
-        return "MT5 runs on the VPS. Please open your VPS to access MetaTrader 5."
+        return "MT5 runs on the VPS at 192.248.191.134. Use Remote Desktop to connect."
     try:
         subprocess.run(["open", "-a", name], check=True)
         return f"Opening {name}."
@@ -160,6 +206,28 @@ def _open_url(url: str) -> str:
     except Exception as exc:
         _log_error(f"Failed to open URL {url}: {exc}")
         return "I couldn't open that URL."
+
+
+def _extract_payload(text: str, markers: tuple[str, ...]) -> Optional[str]:
+    lowered = text.lower()
+    for marker in markers:
+        if marker in lowered:
+            idx = lowered.index(marker) + len(marker)
+            payload = text[idx:].strip(" :,-")
+            if payload:
+                return payload
+    return None
+
+
+def _daily_briefing() -> str:
+    status = nova_apex.get_apex_status()
+    apex_line = nova_apex.format_status_for_speech(status)
+    tasks = nova_memory.list_pending_tasks()
+    return (
+        f"Good morning Kian. {apex_line} "
+        f"{tasks} "
+        "All systems are being monitored."
+    )
 
 
 def _execute_tool(name: str, tool_input: dict) -> tuple[str, bool]:
@@ -197,7 +265,7 @@ def _execute_tool(name: str, tool_input: dict) -> tuple[str, bool]:
         now = datetime.now().strftime("%I:%M %p").lstrip("0")
         return f"It's {now}.", False
     if name == "end_session":
-        return "Goodbye.", True
+        return "Goodbye Kian.", True
     if name == "clear_conversation":
         return "__CLEAR_CONVERSATION__", False
     return "Done.", False
@@ -205,20 +273,29 @@ def _execute_tool(name: str, tool_input: dict) -> tuple[str, bool]:
 
 def _handle_local_command(text: str) -> Tuple[Optional[str], bool]:
     """Fast-path local commands without Claude when patterns are obvious."""
-    lowered = text.lower().strip()
+    cleaned = _strip_nova_prefix(text)
+    lowered = cleaned.lower().strip()
 
-    stop_phrases = ("stop", "goodbye", "that's all", "thats all", "exit nova")
-    if any(lowered == p or lowered.startswith(p + " ") for p in stop_phrases):
-        return "Goodbye.", True
+    if _is_stop_command(cleaned):
+        return "Goodbye Kian.", True
 
     if lowered in ("clear", "clear memory", "clear conversation"):
         return "__CLEAR_CONVERSATION__", False
 
-    if lowered.startswith("add task "):
-        return nova_memory.add_task(text[9:]), False
+    open_response = handle_open_command(cleaned)
+    if open_response:
+        return open_response, False
 
-    if lowered.startswith("add note "):
-        return nova_memory.add_note(text[9:]), False
+    if any(p in lowered for p in ("good morning", "brief me", "daily briefing")):
+        return _daily_briefing(), False
+
+    task_text = _extract_payload(cleaned, ("add task", "remember to", "don't forget", "dont forget"))
+    if task_text:
+        return nova_memory.add_task(task_text), False
+
+    note_text = _extract_payload(cleaned, ("add note",))
+    if note_text:
+        return nova_memory.add_note(note_text), False
 
     task_queries = (
         "what are my tasks",
@@ -230,7 +307,10 @@ def _handle_local_command(text: str) -> Tuple[Optional[str], bool]:
     if any(q in lowered for q in task_queries):
         return nova_memory.list_pending_tasks(), False
 
-    mark_match = re.match(r"mark task (?:done )?(.+)", lowered)
+    if "read my notes" in lowered or "my notes" in lowered:
+        return nova_memory.list_recent_notes(), False
+
+    mark_match = re.search(r"mark task (?:done )?(.+)", lowered)
     if mark_match:
         return nova_memory.mark_task_done(mark_match.group(1)), False
 
@@ -241,27 +321,22 @@ def _handle_local_command(text: str) -> Tuple[Optional[str], bool]:
         now = datetime.now().strftime("%I:%M %p").lstrip("0")
         return f"It's {now}.", False
 
-    dashboard_phrases = ("open dashboard", "show apex", "open railway")
-    if any(p in lowered for p in dashboard_phrases):
-        _open_url(f"{config.APEX_RAILWAY_URL}/dashboard")
-        return "Opening the APEX dashboard.", False
-
-    if "open cursor" in lowered:
-        return _open_mac_app("Cursor"), False
-
     if "open mt5" in lowered:
-        return "MT5 runs on the VPS. Please open your VPS to access MetaTrader 5.", False
+        return "MT5 runs on the VPS at 192.248.191.134. Use Remote Desktop to connect.", False
 
-    open_app_match = re.match(r"open (.+)", lowered)
-    if open_app_match:
-        app = open_app_match.group(1).strip()
-        if app not in ("dashboard", "apex", "railway"):
-            return _open_mac_app(app.title()), False
+    if "vps logs" in lowered or "check the vps logs" in lowered or "check vps logs" in lowered:
+        logs = nova_apex.get_live_logs_text()
+        tail = logs.splitlines()[-5:]
+        return "Recent VPS logs: " + ". ".join(tail) + ".", False
 
     apex_status_phrases = (
         "apex status",
         "how is apex",
+        "how is apex doing",
         "check backtest",
+        "what's the backtest",
+        "whats the backtest",
+        "how are the live trades",
         "how is live",
         "check live",
         "how much money",
@@ -276,12 +351,13 @@ def _handle_local_command(text: str) -> Tuple[Optional[str], bool]:
         return prefix + nova_apex.format_status_for_speech(status), False
 
     if lowered.startswith("start backtest") or lowered.startswith("run backtest"):
-        date_match = re.search(r"from\s+(\d{4}-\d{2}-\d{2})", lowered)
+        date_match = re.search(r"from\s+(\w+\s+\d{4}|\d{4}-\d{2}-\d{2})", lowered)
         url = f"{config.APEX_RAILWAY_URL}/dashboard"
         if date_match:
             url = f"{url}?start={date_match.group(1)}"
         _open_url(url)
-        return "Opening the backtest start page.", False
+        spoken_date = date_match.group(1) if date_match else "the selected date"
+        return f"Starting new backtest from {spoken_date}.", False
 
     return None, False
 
@@ -308,9 +384,8 @@ class NovaBrain:
 
         apex_status = nova_apex.get_apex_status()
         memory_context = nova_memory.get_memory_context()
-
         context_block = (
-            f"Current APEX data: {json.dumps(apex_status, default=str)}\n"
+            f"Current APEX status: {json.dumps(apex_status, default=str)}\n"
             f"User memory: {memory_context}"
         )
 
@@ -331,6 +406,7 @@ class NovaBrain:
             )
         except Exception as exc:
             _log_error(f"Claude API failed: {exc}")
+            print(f"[NOVA] Claude error: {exc}")
             return "I'm having trouble thinking right now.", False
 
         tool_results = []
@@ -428,10 +504,25 @@ def run_session() -> None:
                 nova_voice.speak("I didn't catch that, please try again")
                 continue
 
+            print(f"[NOVA] Processing: {heard}")
+
+            if _is_stop_command(heard):
+                nova_voice.speak("Goodbye Kian.")
+                session_active = False
+                break
+
+            open_response = handle_open_command(heard)
+            if open_response:
+                print(f"[NOVA] Response: {open_response}")
+                if not nova_voice.speak(open_response):
+                    print(f"[NOVA] {open_response}")
+                continue
+
             response, end_session = brain.think(heard)
             if not session_active:
                 break
 
+            print(f"[NOVA] Response: {response}")
             if not nova_voice.speak(response):
                 print(f"[NOVA] {response}")
 

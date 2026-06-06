@@ -109,6 +109,15 @@ def add_note(text: str) -> str:
     return "Note saved."
 
 
+def list_recent_notes(limit: int = 5) -> str:
+    data = load_memory()
+    if not data["notes"]:
+        return "You have no saved notes."
+    recent = data["notes"][-limit:]
+    lines = [f"{n['created']}: {n['text']}" for n in recent]
+    return "Your recent notes are: " + ". ".join(lines) + "."
+
+
 def get_memory_context() -> str:
     """Summary of tasks and notes for Claude context."""
     data = load_memory()
