@@ -41,9 +41,10 @@ def listen() -> Optional[str]:
             print("[NOVA] Listening... speak now.")
             audio = recognizer.listen(source, timeout=10, phrase_time_limit=15)
 
-        text = recognizer.recognize_whisper_api(
+        text = recognizer.recognize_openai(
             audio,
             api_key=config.OPENAI_API_KEY,
+            model="whisper-1",
         )
         print(f"[NOVA] Heard: {text}")
         return text
