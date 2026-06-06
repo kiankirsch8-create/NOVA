@@ -1,8 +1,8 @@
 anthropic
 openai
 elevenlabs
-sounddevice
+SpeechRecognition
+pyaudio
 numpy
 pygame
 requests
-scipy
