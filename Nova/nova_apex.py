@@ -136,20 +136,16 @@ def get_apex_status() -> dict:
 
     backtest = get_backtest_status()
     live = get_live_status()
-    dashboard = get_dashboard_summary()
 
     stale = any(
         item.get("stale")
         for item in (backtest, live)
         if isinstance(item, dict)
-    ) or (
-        isinstance(dashboard, dict) and dashboard.get("stale")
     )
 
     combined = {
         "backtest": backtest,
         "live": live,
-        "dashboard_summary": dashboard,
         "last_updated": datetime.now(timezone.utc).isoformat(),
         "stale": stale,
     }
