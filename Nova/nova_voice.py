@@ -157,7 +157,7 @@ def record_audio() -> Optional[np.ndarray]:
 
 
 def _save_wav(audio: np.ndarray, path: str, sample_rate: int) -> None:
-    """Save mono 16-bit PCM WAV at the given sample rate (16000 Hz for Google STT)."""
+    """Save mono 16-bit PCM WAV at the given sample rate."""
     mono = audio.flatten()
     clipped = np.clip(mono, -1.0, 1.0)
     int_audio = (clipped * 32767).astype(np.int16)

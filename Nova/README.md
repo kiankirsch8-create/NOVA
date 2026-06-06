@@ -25,6 +25,7 @@ cp nova_config.example.py nova_config.py
 ```
 
    - `ANTHROPIC_API_KEY`
+   - `OPENAI_API_KEY`
    - `ELEVENLABS_API_KEY`
 
    `nova_config.py` is gitignored so keys are not committed.

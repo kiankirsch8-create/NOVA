@@ -22,8 +22,8 @@ CONVERSATION_MEMORY_LENGTH = 5
 NOVA_NAME = "NOVA"
 USER_NAME = "Kian"
 
-# Audio recording (16000 Hz mono — required by Google Speech Recognition)
-SAMPLE_RATE = 16000
+# Audio recording (44100 Hz mono for MacBook Air microphone)
+SAMPLE_RATE = 44100
 SILENCE_THRESHOLD = 0.008
 SILENCE_DURATION = 1.5
 MIN_RECORDING_SECONDS = 1.0
