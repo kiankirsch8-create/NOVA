@@ -398,7 +398,7 @@ class NovaBrain:
 
         try:
             response = self._client.messages.create(
-                model=config.CLAUDE_MODEL,
+                model="claude-sonnet-4-6",
                 max_tokens=config.MAX_RESPONSE_TOKENS,
                 system=f"{SYSTEM_PROMPT}\n\n{context_block}",
                 tools=CLAUDE_TOOLS,
@@ -442,7 +442,7 @@ class NovaBrain:
             if not any(b.type == "text" and b.text.strip() for b in response.content):
                 try:
                     followup = self._client.messages.create(
-                        model=config.CLAUDE_MODEL,
+                        model="claude-sonnet-4-6",
                         max_tokens=config.MAX_RESPONSE_TOKENS,
                         system=f"{SYSTEM_PROMPT}\n\n{context_block}",
                         tools=CLAUDE_TOOLS,
