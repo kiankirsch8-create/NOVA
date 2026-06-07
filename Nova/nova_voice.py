@@ -12,6 +12,8 @@ import numpy as np
 import pygame
 import requests
 import speech_recognition as sr
+from elevenlabs import stream as el_stream
+from elevenlabs.client import ElevenLabs
 
 import nova_config
 
@@ -92,7 +94,7 @@ def play_deactivation_sound() -> None:
 
 def speak(text: str) -> bool:
     """
-    Convert text to speech via ElevenLabs and play with pygame.
+    Convert text to speech via ElevenLabs streaming SDK.
     Returns True if audio played, False if fallback to terminal only.
     """
     if not text.strip():
@@ -102,31 +104,14 @@ def speak(text: str) -> bool:
         print(f"[NOVA] {text}")
         return False
 
-    url = f"https://api.elevenlabs.io/v1/text-to-speech/{nova_config.ELEVENLABS_VOICE_ID}"
-    headers = {
-        "xi-api-key": nova_config.ELEVENLABS_API_KEY,
-        "Content-Type": "application/json",
-        "Accept": "audio/mpeg",
-    }
-    payload = {
-        "text": text,
-        "model_id": nova_config.ELEVENLABS_MODEL,
-        "voice_settings": {
-            "stability": nova_config.ELEVENLABS_STABILITY,
-            "similarity_boost": nova_config.ELEVENLABS_SIMILARITY_BOOST,
-        },
-    }
-
     try:
-        response = requests.post(url, json=payload, headers=headers, timeout=60)
-        response.raise_for_status()
-
-        _ensure_pygame_mixer()
-        audio_data = io.BytesIO(response.content)
-        pygame.mixer.music.load(audio_data)
-        pygame.mixer.music.play()
-        while pygame.mixer.music.get_busy():
-            pygame.time.wait(50)
+        client = ElevenLabs(api_key=nova_config.ELEVENLABS_API_KEY)
+        audio_stream = client.text_to_speech.stream(
+            text=text,
+            voice_id=nova_config.ELEVENLABS_VOICE_ID,
+            model_id=nova_config.ELEVENLABS_MODEL,
+        )
+        el_stream(audio_stream)
         return True
     except Exception as exc:
         _log_error(f"ElevenLabs playback failed: {exc}")
