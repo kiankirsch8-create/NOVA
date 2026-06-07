@@ -383,13 +383,36 @@ class NovaBrain:
         if local is not None:
             return local, end_session
 
-        apex_status = nova_apex.get_apex_status()
-        print("[DEBUG] apex fetched")
-        memory_context = nova_memory.get_memory_context()
-        context_block = (
-            f"Current APEX status: {json.dumps(apex_status, default=str)}\n"
-            f"User memory: {memory_context}"
+        APEX_KEYWORDS = (
+            "apex",
+            "backtest",
+            "live",
+            "capital",
+            "trading",
+            "equity",
+            "strategy",
+            "balance",
+            "position",
+            "profit",
+            "loss",
+            "status",
+            "how is",
+            "how are",
+            "performance",
         )
+        apex_needed = any(kw in user_text.lower() for kw in APEX_KEYWORDS)
+
+        memory_context = nova_memory.get_memory_context()
+        if apex_needed:
+            apex_status = nova_apex.get_apex_status()
+            print("[DEBUG] apex fetched")
+            context_block = (
+                f"Current APEX status: {json.dumps(apex_status, default=str)}\n"
+                f"User memory: {memory_context}"
+            )
+        else:
+            apex_status = {}
+            context_block = memory_context
 
         self.conversation.append({"role": "user", "content": user_text})
         print("[DEBUG] calling Claude...")
