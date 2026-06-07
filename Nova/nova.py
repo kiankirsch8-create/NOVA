@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from typing import Optional, Tuple
 
 import anthropic
+from pynput import keyboard as kb
 
 import nova_apex
 import nova_config as config
@@ -493,12 +494,14 @@ session_active = False
 brain = NovaBrain()
 
 
-def _wait_for_stop() -> None:
-    """Background thread: second Enter press stops the active session."""
+def toggle_session() -> None:
     global session_active
-    input()
-    session_active = False
-    print("[NOVA] Stop requested.")
+    if session_active:
+        session_active = False
+        print("[NOVA] Stop requested.")
+    else:
+        session_active = True
+        threading.Thread(target=run_session, daemon=True).start()
 
 
 def run_session() -> None:
@@ -551,12 +554,23 @@ def run_session() -> None:
 
 
 def main() -> None:
+    global session_active
+
     print(f"[NOVA] Starting {config.NOVA_NAME} for {config.USER_NAME}")
-    print("[NOVA] Running in background. Press CMD+J to start a session.")
+    print("[NOVA] Running in background. Press CMD+J to start or stop a session.")
 
     nova_voice.init_microphone()
 
-    kb.GlobalHotKeys({"<cmd>+j": toggle_session}).join()
+    def on_activate():
+        global session_active
+        if not session_active:
+            session_active = True
+            threading.Thread(target=run_session, daemon=True).start()
+        else:
+            session_active = False
+
+    with kb.GlobalHotKeys({"<cmd>+j": on_activate}) as hotkey_listener:
+        hotkey_listener.join()
 
 
 if __name__ == "__main__":
