@@ -93,25 +93,22 @@ def play_deactivation_sound() -> None:
 
 
 def speak(text: str) -> bool:
-    """
-    Convert text to speech via ElevenLabs streaming SDK.
-    Returns True if audio played, False if fallback to terminal only.
-    """
     if not text.strip():
         return False
-
     if nova_config.ELEVENLABS_API_KEY in ("", "your_key_here"):
         print(f"[NOVA] {text}")
         return False
-
     try:
+        from elevenlabs.client import ElevenLabs
+        from elevenlabs import stream as el_stream
         client = ElevenLabs(api_key=nova_config.ELEVENLABS_API_KEY)
-        audio_stream = client.text_to_speech.stream(
+        audio = client.text_to_speech.stream(
             text=text,
             voice_id=nova_config.ELEVENLABS_VOICE_ID,
             model_id=nova_config.ELEVENLABS_MODEL,
+            voice_settings={"stability": nova_config.ELEVENLABS_STABILITY, "similarity_boost": nova_config.ELEVENLABS_SIMILARITY_BOOST}
         )
-        el_stream(audio_stream)
+        el_stream(audio)
         return True
     except Exception as exc:
         _log_error(f"ElevenLabs playback failed: {exc}")
