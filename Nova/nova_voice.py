@@ -106,7 +106,8 @@ def speak(text: str) -> bool:
             text=text,
             voice_id=nova_config.ELEVENLABS_VOICE_ID,
             model_id=nova_config.ELEVENLABS_MODEL,
-            voice_settings={"stability": nova_config.ELEVENLABS_STABILITY, "similarity_boost": nova_config.ELEVENLABS_SIMILARITY_BOOST}
+            voice_settings={"stability": nova_config.ELEVENLABS_STABILITY, "similarity_boost": nova_config.ELEVENLABS_SIMILARITY_BOOST},
+            optimize_streaming_latency=3,
         )
         el_stream(audio)
         return True
