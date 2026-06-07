@@ -551,18 +551,12 @@ def run_session() -> None:
 
 
 def main() -> None:
-    global session_active
-
     print(f"[NOVA] Starting {config.NOVA_NAME} for {config.USER_NAME}")
-    print("Press ENTER to start speaking, press ENTER again to stop")
+    print("[NOVA] Running in background. Press CMD+J to start a session.")
 
     nova_voice.init_microphone()
 
-    while True:
-        input()
-        session_active = True
-        threading.Thread(target=_wait_for_stop, daemon=True).start()
-        run_session()
+    kb.GlobalHotKeys({"<cmd>+j": toggle_session}).join()
 
 
 if __name__ == "__main__":
