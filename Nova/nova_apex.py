@@ -24,7 +24,7 @@ def _log_error(message: str) -> None:
         pass
 
 
-def _get_json(path: str, timeout: int = 30) -> Optional[Union[dict, str]]:
+def _get_json(path: str, timeout: int = 5) -> Optional[Union[dict, str]]:
     url = f"{config.APEX_RAILWAY_URL}{path}"
     try:
         response = requests.get(url, timeout=timeout)
